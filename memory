@@ -1,0 +1,98 @@
+If your Node.js project is calling a Spring API using Axios and memory is not being freed after the handler completes — especially in failure cases — the issue may be due to:
+
+🚨 Potential Causes:
+Unresolved Promises / No Cleanup on Error
+If Axios calls fail and are not handled properly, unhandled rejections or lingering references might cause memory to grow.
+
+Large Response Bodies or Error Objects
+Axios may cache large responses or errors in memory, especially if you're storing them somewhere or not disposing of them.
+
+Global Variables / Closures
+Retaining references in scopes (like middleware or error handlers) can lead to memory not being released.
+
+Event Listeners Not Removed
+If you're attaching listeners in each request (e.g. to req, res, or Axios), they may pile up over time.
+
+Axios Interceptors
+If you’re using Axios interceptors and attaching new ones per request, they will accumulate and leak memory.
+
+✅ Things to Check & Fix
+1. Proper Error Handling with Axios
+Make sure you always catch errors and avoid leaving rejected promises unresolved:
+
+js
+Copy
+Edit
+try {
+  const response = await axios.get('http://spring-api...');
+  res.json(response.data);
+} catch (error) {
+  console.error('Axios error:', error.message);
+  res.status(500).json({ message: 'Failed to fetch data' });
+}
+2. Avoid Re-adding Axios Interceptors on Every Request
+js
+Copy
+Edit
+// ❌ BAD: This will add a new interceptor on every request
+app.use((req, res, next) => {
+  axios.interceptors.request.use(...);
+  next();
+});
+js
+Copy
+Edit
+// ✅ GOOD: Add once during app initialization
+axios.interceptors.request.use(config => {
+  // Modify config
+  return config;
+});
+3. Use a Dedicated Axios Instance
+js
+Copy
+Edit
+const axiosInstance = axios.create({ baseURL: 'http://spring-api' });
+
+app.get('/proxy', async (req, res) => {
+  try {
+    const response = await axiosInstance.get('/endpoint');
+    res.json(response.data);
+  } catch (err) {
+    res.status(500).json({ error: 'API call failed' });
+  }
+});
+This prevents global config pollution or leaks.
+
+4. Memory Profiling Tips
+You can use Node.js heap snapshots to analyze leaks:
+
+Run with --inspect and use Chrome DevTools
+
+Use heapdump or clinic.js:
+
+bash
+Copy
+Edit
+npm install --save heapdump
+In code:
+
+js
+Copy
+Edit
+const heapdump = require('heapdump');
+heapdump.writeSnapshot('/path/to/snapshot.heapsnapshot');
+5. Avoid Holding on to Error Objects
+Avoid pushing errors into a global array or logging detailed error stacks to memory-heavy logs unless needed.
+
+Summary
+Ensure all Axios calls are try/catch-wrapped
+
+Don't add interceptors per request
+
+Avoid global variables holding request data
+
+Use Axios instances
+
+Profile with memory tools if the issue persists
+
+If you'd like, you can share a code snippet of your route handler, and I’ll check it for any leaks or patterns that could cause memory issues.
