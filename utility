@@ -1,0 +1,40 @@
+const SafeDecoder = (() => {
+
+  function looksEncoded(str) {
+    return /%[0-9A-Fa-f]{2}/.test(str);
+  }
+
+  function isEncoded(str) {
+    try {
+      return decodeURIComponent(str) !== str;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function safeDecode(str) {
+    if (typeof str !== 'string') return str;
+
+    let prevStr = str;
+    let currStr = str;
+
+    // Try decoding multiple times (for double-encoded strings)
+    for (let i = 0; i < 3; i++) {
+      try {
+        currStr = decodeURIComponent(currStr);
+        if (currStr === prevStr) break; // Fully decoded
+        prevStr = currStr;
+      } catch (e) {
+        break; // Stop decoding on invalid sequence
+      }
+    }
+    return currStr;
+  }
+
+  function smartDecode(str) {
+    if (!looksEncoded(str)) return str;
+    return safeDecode(str);
+  }
+
+  return { looksEncoded, isEncoded, safeDecode, smartDecode };
+})();
